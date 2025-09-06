@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import apiService from '../services/api'
 
 const AuthContext = createContext()
 
@@ -15,72 +16,115 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check for stored user data on app load
-    const storedUser = localStorage.getItem('user')
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+    // Check for stored token and validate with backend
+    const token = localStorage.getItem('token')
+    if (token) {
+      validateToken()
+    } else {
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
+
+  const validateToken = async () => {
+    try {
+      const response = await apiService.auth.getMe()
+      if (response.success) {
+        setUser(response.data.user)
+      } else {
+        // Token is invalid, remove it
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      }
+    } catch (error) {
+      // Token is invalid or expired
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const login = async (email, password) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const response = await apiService.auth.login({ email, password })
       
-      // Mock user data
-      const userData = {
-        id: '1',
-        email,
-        username: email.split('@')[0],
-        role: 'user'
+      if (response.success) {
+        const { user, token } = response.data
+        setUser(user)
+        localStorage.setItem('token', token)
+        localStorage.setItem('user', JSON.stringify(user))
+        return { success: true }
+      } else {
+        return { success: false, error: response.message || 'Login failed' }
       }
-      
-      setUser(userData)
-      localStorage.setItem('user', JSON.stringify(userData))
-      return { success: true }
     } catch (error) {
-      return { success: false, error: 'Login failed' }
+      return { success: false, error: error.message || 'Login failed' }
     }
   }
 
   const register = async (username, email, password) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const response = await apiService.auth.register({ username, email, password })
       
-      // Mock user data
-      const userData = {
-        id: Date.now().toString(),
-        email,
-        username,
-        role: 'user'
+      if (response.success) {
+        const { user, token } = response.data
+        setUser(user)
+        localStorage.setItem('token', token)
+        localStorage.setItem('user', JSON.stringify(user))
+        return { success: true }
+      } else {
+        return { success: false, error: response.message || 'Registration failed' }
       }
-      
-      setUser(userData)
-      localStorage.setItem('user', JSON.stringify(userData))
-      return { success: true }
     } catch (error) {
-      return { success: false, error: 'Registration failed' }
+      return { success: false, error: error.message || 'Registration failed' }
     }
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem('user')
+  const logout = async () => {
+    try {
+      // Call logout endpoint to invalidate token on server
+      await apiService.auth.logout()
+    } catch (error) {
+      console.error('Logout error:', error)
+    } finally {
+      // Clear local state regardless of API call result
+      setUser(null)
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+    }
   }
 
   const updateProfile = async (updates) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const response = await apiService.auth.updateProfile(updates)
       
-      const updatedUser = { ...user, ...updates }
-      setUser(updatedUser)
-      localStorage.setItem('user', JSON.stringify(updatedUser))
-      return { success: true }
+      if (response.success) {
+        const updatedUser = response.data.user
+        setUser(updatedUser)
+        localStorage.setItem('user', JSON.stringify(updatedUser))
+        return { success: true }
+      } else {
+        return { success: false, error: response.message || 'Update failed' }
+      }
     } catch (error) {
-      return { success: false, error: 'Update failed' }
+      return { success: false, error: error.message || 'Update failed' }
+    }
+  }
+
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      const response = await apiService.auth.changePassword({
+        currentPassword,
+        newPassword
+      })
+      
+      if (response.success) {
+        return { success: true }
+      } else {
+        return { success: false, error: response.message || 'Password change failed' }
+      }
+    } catch (error) {
+      return { success: false, error: error.message || 'Password change failed' }
     }
   }
 
@@ -90,6 +134,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateProfile,
+    changePassword,
     loading
   }
 
