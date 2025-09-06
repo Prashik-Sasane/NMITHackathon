@@ -490,4 +490,4 @@ For support and questions:
 
 ---
 
-**Built with ❤️ for the NMI Hackathon**
+**Built with ❤️ for the NMIT Hackathon**
