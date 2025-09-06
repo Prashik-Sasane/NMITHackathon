@@ -206,9 +206,30 @@
 }
 
 .products-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  display: flex;
+  flex-direction: row;
   gap: 2rem;
+  overflow-x: auto;
+  padding: 1rem 0;
+  scroll-behavior: smooth;
+}
+
+.products-grid::-webkit-scrollbar {
+  height: 8px;
+}
+
+.products-grid::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.products-grid::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.products-grid::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .product-card {
@@ -218,6 +239,8 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
   transition: all 0.3s;
   position: relative;
+  flex: 0 0 300px;
+  min-width: 300px;
 }
 
 .product-card:hover {
@@ -284,6 +307,7 @@
   margin-bottom: 1rem;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -414,8 +438,12 @@
   }
   
   .products-grid {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1.5rem;
+  }
+  
+  .product-card {
+    flex: 0 0 280px;
+    min-width: 280px;
   }
   
   .marketplace-header h1 {

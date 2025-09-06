@@ -12,17 +12,10 @@ import PurchaseHistory from './pages/PurchaseHistory'
 import ProductManagement from './pages/ProductManagement'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
-import Login from "./components/Login"
 
 
 function App() {
 
-
-  return (
-    <>
-    <Login />
-       
-    </>
   return (
     <AuthProvider>
       <CartProvider>
