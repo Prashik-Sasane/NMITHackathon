@@ -11,11 +11,14 @@ const Cart = () => {
   const navigate = useNavigate()
   const [isCheckingOut, setIsCheckingOut] = useState(false)
 
-  const handleQuantityChange = (productId, newQuantity) => {
+  const handleQuantityChange = async (productId, newQuantity) => {
     if (newQuantity <= 0) {
-      removeFromCart(productId)
+      await removeFromCart(productId)
     } else {
-      updateQuantity(productId, newQuantity)
+      const result = await updateQuantity(productId, newQuantity)
+      if (!result.success) {
+        alert(result.error || 'Failed to update quantity')
+      }
     }
   }
 
@@ -27,14 +30,30 @@ const Cart = () => {
 
     setIsCheckingOut(true)
     
-    // Simulate checkout process
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // Mock shipping address and payment info for demo
+    const shippingAddress = {
+      firstName: user.profile?.firstName || 'John',
+      lastName: user.profile?.lastName || 'Doe',
+      street: '123 Main St',
+      city: 'New York',
+      state: 'NY',
+      zipCode: '10001',
+      phone: '123-456-7890'
+    }
+
+    const paymentInfo = {
+      method: 'credit_card'
+    }
     
-    const order = checkout()
+    const result = await checkout(shippingAddress, paymentInfo)
     setIsCheckingOut(false)
     
-    // Navigate to purchase history or show success message
-    navigate('/purchase-history')
+    if (result.success) {
+      // Navigate to purchase history or show success message
+      navigate('/purchase-history')
+    } else {
+      alert(result.error || 'Checkout failed')
+    }
   }
 
   if (cartItems.length === 0) {
@@ -71,13 +90,13 @@ const Cart = () => {
             {cartItems.map(item => (
               <div key={item.id} className="cart-item">
                 <div className="item-image">
-                  <img src={item.image} alt={item.name} />
+                  <img src={item.product?.images?.[0] || item.image} alt={item.product?.name || item.name} />
                 </div>
                 
                 <div className="item-details">
-                  <h3 className="item-name">{item.name}</h3>
-                  <p className="item-description">{item.description}</p>
-                  <div className="item-price">${item.price}</div>
+                  <h3 className="item-name">{item.product?.name || item.name}</h3>
+                  <p className="item-description">{item.product?.description || item.description}</p>
+                  <div className="item-price">${item.product?.price || item.price}</div>
                 </div>
                 
                 <div className="item-quantity">

@@ -1,48 +1,74 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { Search, Filter, Star, ShoppingCart, Heart } from 'lucide-react'
-import { mockProducts, categories } from '../data/mockProducts'
+import apiService from '../services/api'
 import './Marketplace.css'
 
 const Marketplace = () => {
   const { addToCart } = useCart()
+  const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [sortBy, setSortBy] = useState('name')
   const [priceRange, setPriceRange] = useState([0, 1000])
   const [showFilters, setShowFilters] = useState(false)
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalProducts: 0
+  })
 
-  const filteredProducts = useMemo(() => {
-    let filtered = mockProducts.filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           product.description.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory
-      const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1]
-      
-      return matchesSearch && matchesCategory && matchesPrice
-    })
+  useEffect(() => {
+    loadProducts()
+    loadCategories()
+  }, [selectedCategory, sortBy, priceRange, searchTerm])
 
-    // Sort products
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'price-low':
-          return a.price - b.price
-        case 'price-high':
-          return b.price - a.price
-        case 'rating':
-          return b.rating - a.rating
-        case 'name':
-        default:
-          return a.name.localeCompare(b.name)
+  const loadProducts = async () => {
+    try {
+      setLoading(true)
+      const params = {
+        page: 1,
+        limit: 50,
+        ...(selectedCategory !== 'All' && { category: selectedCategory }),
+        ...(searchTerm && { search: searchTerm }),
+        ...(priceRange[0] > 0 && { minPrice: priceRange[0] }),
+        ...(priceRange[1] < 1000 && { maxPrice: priceRange[1] }),
+        sort: sortBy === 'name' ? 'name' : sortBy === 'price-low' ? 'price' : sortBy === 'price-high' ? 'price' : 'createdAt',
+        order: sortBy === 'price-high' ? 'desc' : 'asc'
       }
-    })
 
-    return filtered
-  }, [searchTerm, selectedCategory, sortBy, priceRange])
+      const response = await apiService.products.getAll(params)
+      
+      if (response.success) {
+        setProducts(response.data.products)
+        setPagination(response.data.pagination)
+      }
+    } catch (error) {
+      console.error('Failed to load products:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const handleAddToCart = (product) => {
-    addToCart(product, 1)
+  const loadCategories = async () => {
+    try {
+      const response = await apiService.products.getCategories()
+      if (response.success) {
+        setCategories(['All', ...response.data.categories])
+      }
+    } catch (error) {
+      console.error('Failed to load categories:', error)
+    }
+  }
+
+  const handleAddToCart = async (product) => {
+    const result = await addToCart(product, 1)
+    if (!result.success) {
+      alert(result.error || 'Failed to add item to cart')
+    }
   }
 
   const renderStars = (rating) => {
@@ -139,16 +165,20 @@ const Marketplace = () => {
             </div>
           )}
 
-          <div className="products-grid">
-            {filteredProducts.length === 0 ? (
-              <div className="no-products">
-                <p>No products found matching your criteria.</p>
-              </div>
-            ) : (
-              filteredProducts.map(product => (
-                <div key={product.id} className="product-card">
+        <div className="products-grid">
+          {loading ? (
+            <div className="loading-products">
+              <p>Loading products...</p>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="no-products">
+              <p>No products found matching your criteria.</p>
+            </div>
+          ) : (
+            products.map(product => (
+                <div key={product._id || product.id} className="product-card">
                   <div className="product-image">
-                    <img src={product.image} alt={product.name} />
+                    <img src={product.images?.[0] || product.image} alt={product.name} />
                     <button className="wishlist-btn">
                       <Heart size={20} />
                     </button>
@@ -160,10 +190,10 @@ const Marketplace = () => {
                     
                     <div className="product-rating">
                       <div className="stars">
-                        {renderStars(product.rating)}
+                        {renderStars(product.rating?.average || product.rating || 0)}
                       </div>
                       <span className="rating-text">
-                        {product.rating} ({product.reviews} reviews)
+                        {product.rating?.average || product.rating || 0} ({product.rating?.count || product.reviews || 0} reviews)
                       </span>
                     </div>
                     
@@ -175,7 +205,7 @@ const Marketplace = () => {
                     </div>
                     
                     <div className="product-actions">
-                      <Link to={`/product/${product.id}`} className="view-details-btn">
+                      <Link to={`/product/${product._id || product.id}`} className="view-details-btn">
                         View Details
                       </Link>
                       <button

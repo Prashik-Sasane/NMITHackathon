@@ -69,14 +69,18 @@ const Dashboard = () => {
       return
     }
 
-    // Simulate password update
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setMessage('Password updated successfully!')
-    setPasswordData({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    })
+    const result = await changePassword(passwordData.currentPassword, passwordData.newPassword)
+    
+    if (result.success) {
+      setMessage('Password updated successfully!')
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      })
+    } else {
+      setMessage(result.error || 'Password update failed')
+    }
     
     setLoading(false)
   }

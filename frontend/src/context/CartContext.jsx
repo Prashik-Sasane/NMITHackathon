@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { useAuth } from './AuthContext'
+import apiService from '../services/api'
 
 const CartContext = createContext()
 
@@ -13,96 +15,184 @@ export const useCart = () => {
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([])
   const [purchaseHistory, setPurchaseHistory] = useState([])
+  const [loading, setLoading] = useState(false)
+  const { user } = useAuth()
 
   useEffect(() => {
-    // Load cart and purchase history from localStorage
-    const storedCart = localStorage.getItem('cart')
-    const storedHistory = localStorage.getItem('purchaseHistory')
-    
-    if (storedCart) {
-      setCartItems(JSON.parse(storedCart))
+    if (user) {
+      // Load cart and purchase history from backend when user is authenticated
+      loadCart()
+      loadPurchaseHistory()
+    } else {
+      // Clear cart when user logs out
+      setCartItems([])
+      setPurchaseHistory([])
     }
-    if (storedHistory) {
-      setPurchaseHistory(JSON.parse(storedHistory))
-    }
-  }, [])
+  }, [user])
 
-  useEffect(() => {
-    // Save cart to localStorage whenever it changes
-    localStorage.setItem('cart', JSON.stringify(cartItems))
-  }, [cartItems])
-
-  const addToCart = (product, quantity = 1) => {
-    setCartItems(prevItems => {
-      const existingItem = prevItems.find(item => item.id === product.id)
-      
-      if (existingItem) {
-        return prevItems.map(item =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        )
-      } else {
-        return [...prevItems, { ...product, quantity }]
+  const loadCart = async () => {
+    try {
+      setLoading(true)
+      const response = await apiService.cart.get()
+      if (response.success) {
+        setCartItems(response.data.cart.items || [])
       }
-    })
-  }
-
-  const removeFromCart = (productId) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== productId))
-  }
-
-  const updateQuantity = (productId, quantity) => {
-    if (quantity <= 0) {
-      removeFromCart(productId)
-      return
+    } catch (error) {
+      console.error('Failed to load cart:', error)
+    } finally {
+      setLoading(false)
     }
-    
-    setCartItems(prevItems =>
-      prevItems.map(item =>
-        item.id === productId ? { ...item, quantity } : item
-      )
-    )
   }
 
-  const clearCart = () => {
-    setCartItems([])
+  const loadPurchaseHistory = async () => {
+    try {
+      const response = await apiService.orders.getMyOrders()
+      if (response.success) {
+        setPurchaseHistory(response.data.orders || [])
+      }
+    } catch (error) {
+      console.error('Failed to load purchase history:', error)
+    }
+  }
+
+  const addToCart = async (product, quantity = 1) => {
+    if (!user) {
+      throw new Error('You must be logged in to add items to cart')
+    }
+
+    try {
+      setLoading(true)
+      const response = await apiService.cart.addItem(product._id || product.id, quantity)
+      
+      if (response.success) {
+        setCartItems(response.data.cart.items || [])
+        return { success: true }
+      } else {
+        return { success: false, error: response.message }
+      }
+    } catch (error) {
+      return { success: false, error: error.message }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const removeFromCart = async (productId) => {
+    if (!user) return
+
+    try {
+      setLoading(true)
+      const response = await apiService.cart.removeItem(productId)
+      
+      if (response.success) {
+        setCartItems(response.data.cart.items || [])
+        return { success: true }
+      } else {
+        return { success: false, error: response.message }
+      }
+    } catch (error) {
+      return { success: false, error: error.message }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const updateQuantity = async (productId, quantity) => {
+    if (!user) return
+
+    try {
+      setLoading(true)
+      const response = await apiService.cart.updateItem(productId, quantity)
+      
+      if (response.success) {
+        setCartItems(response.data.cart.items || [])
+        return { success: true }
+      } else {
+        return { success: false, error: response.message }
+      }
+    } catch (error) {
+      return { success: false, error: error.message }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const clearCart = async () => {
+    if (!user) return
+
+    try {
+      setLoading(true)
+      const response = await apiService.cart.clear()
+      
+      if (response.success) {
+        setCartItems([])
+        return { success: true }
+      } else {
+        return { success: false, error: response.message }
+      }
+    } catch (error) {
+      return { success: false, error: error.message }
+    } finally {
+      setLoading(false)
+    }
   }
 
   const getCartTotal = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0)
+    return cartItems.reduce((total, item) => {
+      const price = item.product?.price || item.price || 0
+      return total + (price * item.quantity)
+    }, 0)
   }
 
   const getCartItemCount = () => {
     return cartItems.reduce((total, item) => total + item.quantity, 0)
   }
 
-  const checkout = () => {
-    const order = {
-      id: Date.now().toString(),
-      items: [...cartItems],
-      total: getCartTotal(),
-      date: new Date().toISOString(),
-      status: 'completed'
+  const checkout = async (shippingAddress, paymentInfo) => {
+    if (!user) {
+      throw new Error('You must be logged in to checkout')
     }
-    
-    setPurchaseHistory(prev => [order, ...prev])
-    localStorage.setItem('purchaseHistory', JSON.stringify([order, ...purchaseHistory]))
-    clearCart()
-    
-    return order
+
+    try {
+      setLoading(true)
+      const orderData = {
+        shippingAddress,
+        paymentInfo
+      }
+
+      const response = await apiService.orders.create(orderData)
+      
+      if (response.success) {
+        const order = response.data.order
+        setPurchaseHistory(prev => [order, ...prev])
+        setCartItems([])
+        return { success: true, order }
+      } else {
+        return { success: false, error: response.message }
+      }
+    } catch (error) {
+      return { success: false, error: error.message }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const refreshPurchaseHistory = async () => {
+    await loadPurchaseHistory()
   }
 
   const value = {
     cartItems,
     purchaseHistory,
+    loading,
     addToCart,
     removeFromCart,
     updateQuantity,
     clearCart,
     getCartTotal,
     getCartItemCount,
-    checkout
+    checkout,
+    refreshPurchaseHistory
   }
 
   return (

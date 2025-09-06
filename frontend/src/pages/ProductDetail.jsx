@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { ArrowLeft, Star, Heart, ShoppingCart, Minus, Plus, Truck, Shield, RotateCcw } from 'lucide-react'
-import { mockProducts } from '../data/mockProducts'
+import apiService from '../services/api'
 import './ProductDetail.css'
 
 const ProductDetail = () => {
@@ -15,11 +15,19 @@ const ProductDetail = () => {
   const [isWishlisted, setIsWishlisted] = useState(false)
 
   useEffect(() => {
-    const foundProduct = mockProducts.find(p => p.id === id)
-    if (foundProduct) {
-      setProduct(foundProduct)
-    }
+    loadProduct()
   }, [id])
+
+  const loadProduct = async () => {
+    try {
+      const response = await apiService.products.getById(id)
+      if (response.success) {
+        setProduct(response.data.product)
+      }
+    } catch (error) {
+      console.error('Failed to load product:', error)
+    }
+  }
 
   if (!product) {
     return (
@@ -37,8 +45,11 @@ const ProductDetail = () => {
     )
   }
 
-  const handleAddToCart = () => {
-    addToCart(product, quantity)
+  const handleAddToCart = async () => {
+    const result = await addToCart(product, quantity)
+    if (!result.success) {
+      alert(result.error || 'Failed to add item to cart')
+    }
   }
 
   const handleQuantityChange = (change) => {
@@ -58,13 +69,10 @@ const ProductDetail = () => {
     ))
   }
 
-  // Mock additional images for the product
-  const productImages = [
-    product.image,
-    product.image,
-    product.image,
-    product.image
-  ]
+  // Use product images or fallback to single image
+  const productImages = product.images && product.images.length > 0 
+    ? product.images 
+    : [product.image]
 
   return (
     <div className="product-detail">
@@ -77,7 +85,7 @@ const ProductDetail = () => {
         <div className="product-detail-content">
           <div className="product-images">
             <div className="main-image">
-              <img src={productImages[selectedImage]} alt={product.name} />
+              <img src={productImages[selectedImage] || product.image} alt={product.name} />
               <button
                 className={`wishlist-btn ${isWishlisted ? 'active' : ''}`}
                 onClick={() => setIsWishlisted(!isWishlisted)}
@@ -93,7 +101,7 @@ const ProductDetail = () => {
                   className={`thumbnail ${selectedImage === index ? 'active' : ''}`}
                   onClick={() => setSelectedImage(index)}
                 >
-                  <img src={image} alt={`${product.name} ${index + 1}`} />
+                  <img src={image || product.image} alt={`${product.name} ${index + 1}`} />
                 </button>
               ))}
             </div>
@@ -104,10 +112,10 @@ const ProductDetail = () => {
               <h1 className="product-title">{product.name}</h1>
               <div className="product-rating">
                 <div className="stars">
-                  {renderStars(product.rating)}
+                  {renderStars(product.rating?.average || product.rating || 0)}
                 </div>
                 <span className="rating-text">
-                  {product.rating} ({product.reviews} reviews)
+                  {product.rating?.average || product.rating || 0} ({product.rating?.count || product.reviews || 0} reviews)
                 </span>
               </div>
             </div>
