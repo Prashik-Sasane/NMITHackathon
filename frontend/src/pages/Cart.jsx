@@ -103,14 +103,14 @@ const Cart = () => {
                   <label>Quantity:</label>
                   <div className="quantity-controls">
                     <button
-                      onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                      onClick={() => handleQuantityChange(item.product?._id || item.id, item.quantity - 1)}
                       className="quantity-btn"
                     >
                       <Minus size={16} />
                     </button>
                     <span className="quantity-display">{item.quantity}</span>
                     <button
-                      onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                      onClick={() => handleQuantityChange(item.product?._id || item.id, item.quantity + 1)}
                       className="quantity-btn"
                     >
                       <Plus size={16} />
@@ -119,11 +119,11 @@ const Cart = () => {
                 </div>
                 
                 <div className="item-total">
-                  <div className="total-price">${(item.price * item.quantity).toFixed(2)}</div>
+                  <div className="total-price">${((item.product?.price || item.price) * item.quantity).toFixed(2)}</div>
                 </div>
                 
                 <button
-                  onClick={() => removeFromCart(item.id)}
+                  onClick={() => removeFromCart(item.product?._id || item.id)}
                   className="remove-btn"
                   title="Remove item"
                 >
