@@ -13,7 +13,9 @@ import ProductManagement from './pages/ProductManagement'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 
+
 function App() {
+
   return (
     <AuthProvider>
       <CartProvider>
@@ -58,6 +60,7 @@ function App() {
         </Router>
       </CartProvider>
     </AuthProvider>
+
   )
 }
 
